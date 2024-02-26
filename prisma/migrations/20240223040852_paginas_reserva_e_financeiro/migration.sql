@@ -1,0 +1,19 @@
+-- AlterEnum
+ALTER TYPE "OrderStatus" ADD VALUE 'PAYMENT_FAILED';
+
+-- AlterTable
+ALTER TABLE "User" ADD COLUMN     "totalCredit" DECIMAL(10,2) NOT NULL DEFAULT 0;
+
+-- CreateTable
+CREATE TABLE "Wallet" (
+    "id" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "amount" DECIMAL(10,2) NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "Wallet_pkey" PRIMARY KEY ("id")
+);
+
+-- AddForeignKey
+ALTER TABLE "Wallet" ADD CONSTRAINT "Wallet_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

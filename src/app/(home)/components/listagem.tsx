@@ -52,7 +52,6 @@ const SalaList = ({
   }>({});
 
   const { addSalaToCart } = useContext(CartContext);
-
   useEffect(() => {
     const horariosDisponiveisAtualizados: { [key: string]: string[] } = {};
 
@@ -61,20 +60,28 @@ const SalaList = ({
       const todosHorarios = Array.from({ length: 12 }, (_, index) => index + 8);
       const horariosReservadosDaSala = horariosReservados
         .filter((h) => h.salaId === sala.id)
-        .map((h) => h.startTime.split("T")[1].substring(0, 5));
+        .map((h) => h.startTime.split("T")[1].substring(0, 5)); // Extrair apenas a parte do horário (HH:MM)
 
+      // Verificar disponibilidade de cada horário
       const horariosDisponiveis = todosHorarios.filter(
-        (horario) => !horariosReservadosDaSala.includes(`${horario}:00`),
+        (horario) =>
+          !horariosReservadosDaSala.includes(
+            String(horario).padStart(2, "0") + ":00",
+          ),
       );
 
-      horariosDisponiveisAtualizados[sala.id] = horariosDisponiveis.map(String);
+      horariosDisponiveisAtualizados[sala.id] = horariosDisponiveis.map(
+        (horario) => String(horario).padStart(2, "0") + ":00",
+      );
     });
 
     setHorariosDisponiveis(horariosDisponiveisAtualizados);
   }, [salas, horariosReservados]);
 
   const isHorarioReservado = (salaId: string, horario: string) => {
-    return horariosDisponiveis[salaId]?.includes(horario);
+    // Converta o horário para o formato "HH:00"
+    const horarioFormatado = String(horario).padStart(2, "0") + ":00";
+    return horariosDisponiveis[salaId]?.includes(horarioFormatado);
   };
   const handleReserva = (sala: any) => {
     const { id, name, basePrice, discountPercentage, opcionais } = sala;
@@ -91,8 +98,10 @@ const SalaList = ({
 
           if (option) {
             return {
+              id: option.id,
               name: option.name,
               quantity: quantity,
+              price: option.price,
             };
           }
 
@@ -121,7 +130,11 @@ const SalaList = ({
         salaOptions,
       );
     });
-
+    setSelectedOptionsQuantity((prev) => ({
+      ...prev,
+      [id]: [], // Isso sempre redefine para um array vazio
+    }));
+    
     setSelectedOptions((prev) => ({
       ...prev,
       [id]: [], // Isso sempre redefine para um array vazio
@@ -212,21 +225,26 @@ const SalaList = ({
                             onClick={() => {
                               const horarioStr = String(horario);
                               setSelectedHorarios((prev) => {
-                                const isSelected = (prev[sala.id] || []).includes(horarioStr);
-                        
+                                const isSelected = (
+                                  prev[sala.id] || []
+                                ).includes(horarioStr);
+
                                 if (isSelected) {
                                   // If already selected, remove it
                                   return {
                                     ...prev,
                                     [sala.id]: (prev[sala.id] || []).filter(
-                                      (selected) => selected !== horarioStr
+                                      (selected) => selected !== horarioStr,
                                     ),
                                   };
                                 } else {
                                   // If not selected, add it
                                   return {
                                     ...prev,
-                                    [sala.id]: [...(prev[sala.id] || []), horarioStr],
+                                    [sala.id]: [
+                                      ...(prev[sala.id] || []),
+                                      horarioStr,
+                                    ],
                                   };
                                 }
                               });
@@ -239,7 +257,19 @@ const SalaList = ({
                               isHorarioReservado(sala.id, String(horario))
                                 ? "white"
                                 : "black"
-                            } bg-${selectedHorarios[sala.id]?.includes(String(horario)) ? "black" : "white"} text-${selectedHorarios[sala.id]?.includes(String(horario)) ? "white" : "black"}`}
+                            } bg-${
+                              selectedHorarios[sala.id]?.includes(
+                                String(horario),
+                              )
+                                ? "black"
+                                : "white"
+                            } text-${
+                              selectedHorarios[sala.id]?.includes(
+                                String(horario),
+                              )
+                                ? "white"
+                                : "black"
+                            }`}
                           >
                             {`${horario}:00 - ${horario + 1}:00`}
                           </Button>
@@ -256,23 +286,20 @@ const SalaList = ({
                       <div className="list-price flex flex-wrap gap-2">
                         {options && options.length > 0 && (
                           <div className="list-price flex flex-row gap-2">
-                           <ul className="flex flex-wrap gap-2">
-                           {options.map((opcao, index) => (
-                              
-                              <li key={index}>
-                                {opcao.name} - R${" "}
-                                {opcao.price
-                                  ? Number(opcao.price).toFixed(2)
-                                  : "Preço não disponível"}
-                              </li>
-                             
-                              
-                            ))}
+                            <ul className="flex flex-wrap gap-2">
+                              {options.map((opcao, index) => (
+                                <li key={index}>
+                                  {opcao.name} - R${" "}
+                                  {opcao.price
+                                    ? Number(opcao.price).toFixed(2)
+                                    : "Preço não disponível"}
+                                </li>
+                              ))}
                             </ul>
                           </div>
                         )}
-                        {options.map((opcao, index) => (
-                          <div className="flex gap-1" key={index}>
+                        {options.map((opcao) => (
+                          <div className="flex gap-1" key={opcao.id}>
                             <Button
                               onClick={() => {
                                 console.log("Clicked on option:", opcao.name);
@@ -286,19 +313,17 @@ const SalaList = ({
                                   const existingOptionIndex =
                                     existingOptions.findIndex(
                                       (selectedOption: any) =>
-                                        selectedOption.index === index,
+                                        selectedOption.id === opcao.id,
                                     );
 
                                   if (existingOptionIndex !== -1) {
                                     // Se o opcional já estiver na lista, atualize a quantidade
                                     const updatedOptions = [...existingOptions];
                                     updatedOptions[existingOptionIndex] = {
-                                      index,
-                                      name: opcao.name,
+                                      ...updatedOptions[existingOptionIndex],
                                       quantity:
-                                        (updatedOptions[existingOptionIndex]
-                                          ?.quantity || 0) + 1,
-                                      price: Number(opcao.price)
+                                        updatedOptions[existingOptionIndex]
+                                          .quantity + 1,
                                     };
 
                                     console.log(
@@ -314,7 +339,12 @@ const SalaList = ({
                                     // Se o opcional não estiver na lista, adicione-o com a quantidade 1
                                     console.log("New selectedOptions state:", [
                                       ...existingOptions,
-                                      { index, name: opcao.name, quantity: 1, price: opcao.price },
+                                      {
+                                        id: opcao.id,
+                                        name: opcao.name,
+                                        quantity: 1,
+                                        price: opcao.price,
+                                      },
                                     ]);
 
                                     return {
@@ -322,7 +352,7 @@ const SalaList = ({
                                       [sala.id]: [
                                         ...existingOptions,
                                         {
-                                          index,
+                                          id: opcao.id,
                                           name: opcao.name,
                                           quantity: 1,
                                           price: opcao.price,
@@ -334,22 +364,23 @@ const SalaList = ({
 
                                 setSelectedOptionsQuantity((prev) => ({
                                   ...prev,
-                                  [`${sala.id}-${index}`]:
-                                    (prev[`${sala.id}-${index}`] || 0) + 1,
+                                  [`${sala.id}-${opcao.id}`]:
+                                    (prev[`${sala.id}-${opcao.id}`] || 0) + 1,
                                 }));
                               }}
                               className={`w-content active:bg-${
-                                selectedOptions[sala.id]?.find(
+                                selectedOptions[sala.id]?.findIndex(
                                   (selectedOption) =>
-                                    selectedOption.index === index,
-                                )
+                                    selectedOption.id === opcao.id,
+                                ) !== -1
                                   ? "black"
                                   : "black"
                               }`}
                             >
                               + {opcao.name} (
-                              {selectedOptionsQuantity[`${sala.id}-${index}`] ||
-                                0}
+                              {selectedOptionsQuantity[
+                                `${sala.id}-${opcao.id}`
+                              ] || 0}
                               )
                             </Button>
 
@@ -365,7 +396,7 @@ const SalaList = ({
                                   const newState = {
                                     ...prev,
                                     [sala.id]: (prev[sala.id] || []).filter(
-                                      (selected) => selected.index !== index,
+                                      (selected) => selected.id !== opcao.id,
                                     ),
                                   };
 
@@ -379,17 +410,17 @@ const SalaList = ({
 
                                 setSelectedOptionsQuantity((prev) => ({
                                   ...prev,
-                                  [`${sala.id}-${index}`]: Math.max(
-                                    (prev[`${sala.id}-${index}`] || 0) - 1,
+                                  [`${sala.id}-${opcao.id}`]: Math.max(
+                                    (prev[`${sala.id}-${opcao.id}`] || 0) - 1,
                                     0,
                                   ),
                                 }));
                               }}
                               className={`bg-${
-                                selectedOptions[sala.id]?.find(
+                                selectedOptions[sala.id]?.findIndex(
                                   (selectedOption) =>
-                                    selectedOption.index === index,
-                                )
+                                    selectedOption.id === opcao.id,
+                                ) !== -1
                                   ? "black"
                                   : "black"
                               }`}

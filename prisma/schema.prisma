@@ -28,9 +28,10 @@ model SalaHorario {
   id            String      @id @default(uuid())
   salaId        String
   sala          Sala        @relation(fields: [salaId], references: [id])
+  orderSalaId     String
+  orderSala       OrderSala       @relation(fields: [orderSalaId], references: [id])
   startTime     DateTime     // Horário de início e termino no formato desejado (por exemplo, "8:00")
   endTime     DateTime
-  orderSala      OrderSala[]
   createdAt   DateTime    @default(now())
 }
 
@@ -67,6 +68,7 @@ model OrderOpcional {
 enum OrderStatus {
   WAITING_FOR_PAYMENT
   PAYMENT_CONFIRMED
+  PAYMENT_FAILED
 }
 
 model OrderSala {
@@ -80,6 +82,16 @@ model OrderSala {
   salaHorario       SalaHorario[]
   orderOpcionais OrderOpcional[]
   createdAt   DateTime    @default(now())
+}
+
+model Wallet {
+  id        String  @id @default(uuid())
+  userId    String
+  user      User    @relation(fields: [userId], references: [id])
+  amount    Decimal @db.Decimal(10, 2)
+  createdAt DateTime @default(now())
+  updatedAt   DateTime      @default(now()) @updatedAt
+  
 }
 
 
@@ -119,6 +131,8 @@ model User {
   accounts      Account[]
   sessions      Session[]
   Order         Order[]
+  wallet         Wallet[]
+  totalCredit Decimal @db.Decimal(10, 2) @default(0)
 }
 
 model VerificationToken {

@@ -19,16 +19,30 @@ const Home = () => {
     const data = await response.json();
     setSalas(data.reverse());
   };
+  
+ useEffect(() => {
+  fetchSalas(); // Busca as salas iniciais
+  
+  const currentDate = new Date().toISOString().slice(0, 10);
+  setSelectedDate(currentDate); // Define a data atual
+  setNumberOfPeople('1'); // Define o número de pessoas como 1
+}, []);
 
-  // UseEffect para buscar salas no início
-  useEffect(() => {
-    fetchSalas();
-  }, []); // O segundo argumento [] garante que isso só seja executado uma vez no início
+useEffect(() => {
+  // Certifique-se de que numberOfPeople esteja definido antes de fazer a busca
+  if (numberOfPeople) {
+    fetchSearchSalas();
+    fetchSalaHorario();
+  }
+}, [selectedDate, numberOfPeople]);
+
 
   const fetchSearchSalas = async () => {
+
     const response = await fetch(`http://localhost:3000/api/salaSearch/${numberOfPeople}`);
     const data = await response.json();
-
+    
+    console.log("numero de pesssoas:", numberOfPeople);
     // Filtrar salas adicionais que são anexáveis
     const filteredSalas = data.filter((sala: any) => sala.numberPeoples >= numberOfPeople || sala.anexavel);
 
@@ -55,7 +69,7 @@ const Home = () => {
   };
 
   useEffect(() => {
-    fetchOptions();
+    fetchOptions(); 
   }, []);
 
   // Função para lidar com a pesquisa
@@ -65,11 +79,7 @@ const Home = () => {
 
     // Agora, buscar salas com base nos filtros
     await fetchSearchSalas();
-
-
     await fetchSalaHorario();
-    
-
   };
 
   return (
@@ -82,6 +92,7 @@ const Home = () => {
               id="data"
               type="date"
               onChange={(e) => setSelectedDate(e.target.value)}
+              value={selectedDate} // Definindo o valor do input como a data selecionada
             />
           </div>
           <div className="flex  flex-col justify-end align-baseline">
@@ -90,8 +101,10 @@ const Home = () => {
               className="w-24"
               id="pessoas"
               type="number"
-              placeholder="0"
+              min={1}
+              placeholder="1"
               onChange={(e) => setNumberOfPeople(e.target.value)}
+              value={numberOfPeople} // Definindo o valor do input como o número de pessoas
             />
           </div>
           <div className="flex  flex-col justify-end align-baseline">
@@ -108,3 +121,4 @@ const Home = () => {
 };
 
 export default Home;
+

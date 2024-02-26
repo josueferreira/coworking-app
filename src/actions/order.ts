@@ -1,64 +1,75 @@
+//order.ts
 "use server";
 import { prismaClient } from "@/lib/prisma";
 import { CartSala } from "@/helpers/sala";
+import { InterfaceOption } from "@/provider/cart";
+import { useRouter } from 'next/navigation';
 
 export const createOrder = async (
-  cartSalas: CartSala[],
-  userId: string,
-  dataReserva: Date,
+  { userId, reservations, totalPrice, ...rest }: { userId: string; reservations: CartSala[]; totalPrice: number; /* additional data */ }
 ) => {
-  const order = await prismaClient.$transaction(async (prisma) => {
-    // Crie um novo pedido no banco de dados
-    const order = await prisma.order.create({
-      data: {
-        userId,
-        status: "WAITING_FOR_PAYMENT",
-        totalPrice: 0,
-        orderSalas: {
-          create: cartSalas.map((sala) => ({
-            salaId: sala.id,
-            basePrice: sala.totalPrice,
-            discountPercentage: sala.discountPercentage,
-          })),
-        },
-      },
-      include: { orderSalas: true },
-    });
-
- // Mapeie e crie os horários para cada sala
-await Promise.all(
-  cartSalas.map(async (sala) => {
-    await Promise.all(
-      sala.horarios.map(async (horario) => {
-        // Suponha que horario seja uma string no formato 'HH'
-        const startHour = parseInt(horario);
-        const dataReservaWithTime = new Date(dataReserva);
-        console.log("Data REservaaa",dataReservaWithTime);
-        dataReservaWithTime.setHours(startHour, 0, 0, 0); // Define hora e minutos na data da reserva
-
-        // Calcule endTime adicionando 1 hora ao startTime
-        const endTime = new Date(dataReservaWithTime.getTime());
-        endTime.setHours(endTime.getHours() + 1); // Adiciona 1 hora
-
-        // Converta para o horário do Brasil (UTC-3)
-        dataReservaWithTime.setUTCHours(dataReservaWithTime.getUTCHours() - 3);
-        endTime.setUTCHours(endTime.getUTCHours() - 3);
-
-        await prisma.salaHorario.create({
-          data: {
-            salaId: sala.id,
-            startTime: dataReservaWithTime,
-            endTime,
-          },
-        });
-      }),
-    );
-  }),
-);
-
-
-    return order;
+  // Crie um novo pedido no banco de dados
+  const createdOrder = await prismaClient.order.create({
+    data: {
+      userId,
+      status: "WAITING_FOR_PAYMENT",
+      totalPrice,
+      ...rest, // Inclua propriedades adicionais aqui, se necessário
+    },
+    include: { orderSalas: true },
   });
 
-  return order;
+  // Mapeie os orderSalas para acessar facilmente o orderSalaId
+  const salaIdToOrderSalaId: Record<string, string> = {};
+
+  // Crie as OrderSalas associadas à Order criada
+  await Promise.all(reservations.map(async (sala) => {
+    const createdOrderSala = await prismaClient.orderSala.create({
+      data: {
+        salaId: sala.id,
+        orderId: createdOrder.id,
+        basePrice: sala.basePrice,
+        discountPercentage: sala.discountPercentage,
+      },
+    });
+
+    salaIdToOrderSalaId[sala.id] = createdOrderSala.id;
+
+    // Crie os opcionais para cada sala
+    await Promise.all(sala.options.map(async (opcional) => {
+      await prismaClient.orderOpcional.create({
+        data: {
+          orderSalaId: createdOrderSala.id,
+          opcionalId: opcional.id,
+          quantity: opcional.quantity,
+        },
+      });
+    }));
+
+    // Crie os horários para cada sala
+    await Promise.all(sala.horarios.map(async (horario) => {
+      // Suponha que horario seja uma string no formato 'HH'
+      const startHour = parseInt(horario);
+
+      // Clone a dataReserva para evitar modificá-la
+      const reservaDate = new Date(sala.dataReserva);
+
+      // Adicione manualmente as horas ao startTime
+      reservaDate.setHours(reservaDate.getHours() + startHour);
+
+      // Calcule endTime adicionando 1 hora ao startTime
+      const endTime = new Date(reservaDate.getTime() + 60 * 60 * 1000); // Adicionar 1 hora
+
+      await prismaClient.salaHorario.create({
+        data: {
+          salaId: sala.id,
+          orderSalaId: createdOrderSala.id,
+          startTime: reservaDate,
+          endTime,
+        },
+      });
+    }));
+  }));
+
+  return createdOrder;
 };
