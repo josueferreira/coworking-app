@@ -8,44 +8,15 @@ import { useState, useEffect } from 'react';
 const Home = () => {
   const [salas, setSalas] = useState([]);
   const [filteredSalas, setFilteredSalas] = useState([]);
-  const [horarioReservado, sethorarioReservado] = useState([]);
+  const [horarioReservado, setHorarioReservado] = useState([]);
   const [selectedDate, setSelectedDate] = useState('');
   const [numberOfPeople, setNumberOfPeople] = useState('');
   const [options, setOptions] = useState([]);
 
-  // Função para buscar e definir a lista completa de salas
-  const fetchSalas = async () => {
-    const response = await fetch('http://localhost:3000/api/sala');
-    const data = await response.json();
-    setSalas(data.reverse());
-  };
-  
- useEffect(() => {
-  fetchSalas(); // Busca as salas iniciais
-  
-  const currentDate = new Date().toISOString().slice(0, 10);
-  setSelectedDate(currentDate); // Define a data atual
-  setNumberOfPeople('1'); // Define o número de pessoas como 1
-}, []);
-
-useEffect(() => {
-  // Certifique-se de que numberOfPeople esteja definido antes de fazer a busca
-  if (numberOfPeople) {
-    fetchSearchSalas();
-    fetchSalaHorario();
-  }
-}, [selectedDate, numberOfPeople]);
-
-
   const fetchSearchSalas = async () => {
-
     const response = await fetch(`http://localhost:3000/api/salaSearch/${numberOfPeople}`);
     const data = await response.json();
-    
-    console.log("numero de pesssoas:", numberOfPeople);
-    // Filtrar salas adicionais que são anexáveis
     const filteredSalas = data.filter((sala: any) => sala.numberPeoples >= numberOfPeople || sala.anexavel);
-
     setFilteredSalas(filteredSalas.reverse());
   };
 
@@ -53,31 +24,62 @@ useEffect(() => {
     try {
       const response = await fetch(`http://localhost:3000/api/reservaSearch/${selectedDate}`);
       const data = await response.json();
-      // Faça o que for necessário com os dados retornados, por exemplo, atualizar o estado
-      console.log('Dados da SalaHorario:', data);
-      sethorarioReservado(data);
-
+      setHorarioReservado(data);
     } catch (error) {
       console.error('Erro ao buscar dados da SalaHorario:', error);
     }
   };
 
-  const fetchOptions = async () => {
-    const response = await fetch('http://localhost:3000/api/opcionais');
-    const data = await response.json();
-    setOptions(data);
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!numberOfPeople) return;
+
+      try {
+        const searchSalasPromise = fetchSearchSalas();
+        const salaHorarioPromise = fetchSalaHorario();
+        await Promise.all([searchSalasPromise, salaHorarioPromise]);
+        await fetchSearchSalas();
+        await fetchSalaHorario();
+      } catch (error) {
+        console.error('Erro ao buscar dados:', error);
+      }
+    };
+
+    fetchData();
+  }, [selectedDate, numberOfPeople]);
+
+  const fetchSalas = async () => {
+    try {
+      const response = await fetch('http://localhost:3000/api/sala');
+      const data = await response.json();
+      setSalas(data.reverse());
+    } catch (error) {
+      console.error('Erro ao buscar salas:', error);
+    }
   };
 
   useEffect(() => {
-    fetchOptions(); 
+    fetchSalas();
+    const currentDate = new Date().toISOString().slice(0, 10);
+    setSelectedDate(currentDate);
+    setNumberOfPeople('1');
   }, []);
 
-  // Função para lidar com a pesquisa
-  const handleSearch = async () => {
-    // Lógica de pesquisa ou chamada de outras funções relacionadas à pesquisa
-    // ...
+  const fetchOptions = async () => {
+    try {
+      const response = await fetch('http://localhost:3000/api/opcionais');
+      const data = await response.json();
+      setOptions(data);
+    } catch (error) {
+      console.error('Erro ao buscar opções:', error);
+    }
+  };
 
-    // Agora, buscar salas com base nos filtros
+  useEffect(() => {
+    fetchOptions();
+  }, []);
+
+  const handleSearch = async () => {
     await fetchSearchSalas();
     await fetchSalaHorario();
   };
@@ -92,7 +94,7 @@ useEffect(() => {
               id="data"
               type="date"
               onChange={(e) => setSelectedDate(e.target.value)}
-              value={selectedDate} // Definindo o valor do input como a data selecionada
+              value={selectedDate}
             />
           </div>
           <div className="flex  flex-col justify-end align-baseline">
@@ -104,7 +106,7 @@ useEffect(() => {
               min={1}
               placeholder="1"
               onChange={(e) => setNumberOfPeople(e.target.value)}
-              value={numberOfPeople} // Definindo o valor do input como o número de pessoas
+              value={numberOfPeople}
             />
           </div>
           <div className="flex  flex-col justify-end align-baseline">
@@ -114,11 +116,9 @@ useEffect(() => {
       </div>
       <div className="flex flex-col items-center justify-items-center py-14 bg-black">
         <SalaList salas={filteredSalas.length > 0 ? filteredSalas.reverse() : salas} horariosReservados={horarioReservado} selectedDate={selectedDate} options={options}/>
-        
       </div>
     </>
   );
 };
 
 export default Home;
-
